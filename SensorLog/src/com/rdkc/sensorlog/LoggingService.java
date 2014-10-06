@@ -16,13 +16,10 @@ import android.content.Intent;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
-import android.hardware.SensorListener;
 import android.hardware.SensorManager;
-import android.media.MediaPlayer;
-import android.media.MediaPlayer.OnCompletionListener;
 import android.os.IBinder;
+import android.support.v4.app.NotificationCompat;
 import android.util.Log;
-import android.widget.Button;
 
 public class LoggingService extends Service implements SensorEventListener {
 
@@ -76,7 +73,7 @@ public class LoggingService extends Service implements SensorEventListener {
 		final PendingIntent pendingIntent = PendingIntent.getActivity(this, 0,
 				notificationIntent, 0);
 
-		final Notification notification = new Notification.Builder(
+		final Notification notification = new NotificationCompat.Builder(
 				getApplicationContext())
 				.setSmallIcon(android.R.drawable.ic_menu_info_details)
 				.setOngoing(true).setContentTitle("Sensor Logging")
