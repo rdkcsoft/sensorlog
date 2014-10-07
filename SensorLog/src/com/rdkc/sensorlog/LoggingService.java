@@ -9,6 +9,7 @@ import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
+import android.app.Dialog;
 import android.app.Notification;
 import android.app.PendingIntent;
 import android.app.Service;
@@ -20,6 +21,7 @@ import android.hardware.SensorManager;
 import android.os.IBinder;
 import android.support.v4.app.NotificationCompat;
 import android.util.Log;
+import android.widget.Toast;
 
 public class LoggingService extends Service implements SensorEventListener {
 
@@ -72,7 +74,8 @@ public class LoggingService extends Service implements SensorEventListener {
 		}
 		if (null == (mGyroscope = mSensorManager
 				.getDefaultSensor(Sensor.TYPE_GYROSCOPE_UNCALIBRATED))) {
-			throw new RuntimeException("no gyroscope found");
+			Log.w("No gyroscope found on device!", "warn");
+			Toast.makeText(this, "No gyro on device!", Toast.LENGTH_LONG).show();
 		}
 
 		// Create a notification area notification so the user 
@@ -130,11 +133,13 @@ public class LoggingService extends Service implements SensorEventListener {
 			mSensorManager.registerListener(this, mAccelerometer,
 					SensorManager.SENSOR_DELAY_NORMAL);
 			
-			fosGyro = openFileOutput(fileNameGyro, MODE_PRIVATE);
-			pwGyro = new PrintWriter(new BufferedWriter(
-					new OutputStreamWriter(fosGyro)));
-			mSensorManager.registerListener(this, mGyroscope,
-					SensorManager.SENSOR_DELAY_NORMAL);
+			if(mGyroscope != null) {
+				fosGyro = openFileOutput(fileNameGyro, MODE_PRIVATE);
+				pwGyro = new PrintWriter(new BufferedWriter(
+						new OutputStreamWriter(fosGyro)));
+				mSensorManager.registerListener(this, mGyroscope,
+						SensorManager.SENSOR_DELAY_NORMAL);
+			}
 			
 			running = true;
 		} catch (FileNotFoundException e) {
@@ -145,7 +150,11 @@ public class LoggingService extends Service implements SensorEventListener {
 	
 	protected void stopRecording() {
 		pwAccel.close();
-		pwGyro.close();
+		
+		if(mGyroscope != null) {
+			pwGyro.close();
+		}
+		
 		mSensorManager.unregisterListener(this);
 		running = false;
 	}
