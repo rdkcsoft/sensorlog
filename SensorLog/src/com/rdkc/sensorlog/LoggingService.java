@@ -30,14 +30,20 @@ public class LoggingService extends Service implements SensorEventListener {
 	private final String TAG = "LoggingService";
 
 	private static final int NOTIFICATION_ID = 1;
+	private static final int SENSOR_INTERVAL = 500;
 	
 	// References to SensorManager and accelerometer
 	private SensorManager mSensorManager;
 	private Sensor mAccelerometer;
+	private Sensor mGyroscope;
 	
 	private long lastUpdateAccel;
 	private FileOutputStream fosAccel;
 	private PrintWriter pwAccel;
+	
+	private long lastUpdateGyro;
+	private FileOutputStream fosGyro;
+	private PrintWriter pwGyro;
 	
 	private final DateFormat sd = new SimpleDateFormat("yyMMdd_HHmmss");
 
@@ -62,15 +68,18 @@ public class LoggingService extends Service implements SensorEventListener {
 		// Get reference to SensorManager
 		mSensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
 
-		// Get reference to Accelerometer
+		// Get references to sensors
 		if (null == (mAccelerometer = mSensorManager
 				.getDefaultSensor(Sensor.TYPE_ACCELEROMETER))) {
 			throw new RuntimeException("no accelerometer found");
 		}
+		if (null == (mGyroscope = mSensorManager
+				.getDefaultSensor(Sensor.TYPE_GYROSCOPE_UNCALIBRATED))) {
+			throw new RuntimeException("no gyroscope found");
+		}
 
 		// Create a notification area notification so the user 
-		// can get back to the client UI
-		
+		// can get back to the client UI		
 		final Intent notificationIntent = new Intent(getApplicationContext(),
 				MainActivity.class);
 		final PendingIntent pendingIntent = PendingIntent.getActivity(this, 0,
@@ -95,7 +104,7 @@ public class LoggingService extends Service implements SensorEventListener {
 	@Override
 	public int onStartCommand(Intent intent, int flags, int startid) {
 
-		startRecording("accel_" +sd.format(new Date()));
+		startRecording("accel_" +sd.format(new Date()), "gyro_" +sd.format(new Date()));
 		Log.d("====== service started", "debug");
 
 		// Do not automatically restart this service if it is killed
@@ -115,14 +124,21 @@ public class LoggingService extends Service implements SensorEventListener {
 		return null;
 	}
 	
-	protected void startRecording(String fileNameAccel) {
+	protected void startRecording(String fileNameAccel, String fileNameGyro) {
 		
 		try {
 			fosAccel = openFileOutput(fileNameAccel, MODE_PRIVATE);
 			pwAccel = new PrintWriter(new BufferedWriter(
 					new OutputStreamWriter(fosAccel)));
 			mSensorManager.registerListener(this, mAccelerometer,
-					SensorManager.SENSOR_DELAY_UI);
+					SensorManager.SENSOR_DELAY_NORMAL);
+			
+			fosGyro = openFileOutput(fileNameGyro, MODE_PRIVATE);
+			pwGyro = new PrintWriter(new BufferedWriter(
+					new OutputStreamWriter(fosGyro)));
+			mSensorManager.registerListener(this, mGyroscope,
+					SensorManager.SENSOR_DELAY_NORMAL);
+			
 			running = true;
 		} catch (FileNotFoundException e) {
 			e.printStackTrace();
@@ -132,6 +148,7 @@ public class LoggingService extends Service implements SensorEventListener {
 	
 	protected void stopRecording() {
 		pwAccel.close();
+		pwGyro.close();
 		mSensorManager.unregisterListener(this);
 		running = false;
 	}
@@ -142,12 +159,15 @@ public class LoggingService extends Service implements SensorEventListener {
 		if (event.sensor.getType() == Sensor.TYPE_ACCELEROMETER) {
 			processAccelEvent(event);
 		}
+		else if (event.sensor.getType() == Sensor.TYPE_GYROSCOPE_UNCALIBRATED) {
+			processGyroEvent(event);
+		}
 	}
 
 	private void processAccelEvent(SensorEvent event) {
 		long actualTime = System.currentTimeMillis();
 
-		if (actualTime - lastUpdateAccel > 500) {
+		if (actualTime - lastUpdateAccel > SENSOR_INTERVAL) {
 
 			lastUpdateAccel = actualTime;
 
@@ -169,6 +189,23 @@ public class LoggingService extends Service implements SensorEventListener {
 					String.valueOf(mAccel[0]) + "," +
 					String.valueOf(mAccel[1]) + "," +
 					String.valueOf(mAccel[2]));
+		}
+	}
+	
+	private void processGyroEvent(SensorEvent event) {
+		long actualTime = System.currentTimeMillis();
+
+		if (actualTime - lastUpdateGyro > SENSOR_INTERVAL) {
+
+			lastUpdateGyro = actualTime;
+
+			pwGyro.println(actualTime + "," +
+					String.valueOf(event.values[0]) + "," +
+					String.valueOf(event.values[1]) + "," +
+					String.valueOf(event.values[2]) + "," +
+					String.valueOf(event.values[3]) + "," +
+					String.valueOf(event.values[4]) + "," +
+					String.valueOf(event.values[5]));
 		}
 	}
 
