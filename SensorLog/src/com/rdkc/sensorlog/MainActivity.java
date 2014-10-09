@@ -4,17 +4,26 @@ package com.rdkc.sensorlog;
 
 import java.io.File;
 import java.io.FilenameFilter;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+
+import org.apache.commons.io.FileUtils;
 
 import android.app.Activity;
 import android.content.Intent;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.widget.Button;
 
 import com.parse.Parse;
+import com.parse.ParseException;
 import com.parse.ParseFile;
 import com.parse.ParseObject;
+import com.parse.SaveCallback;
+import com.rdkc.sensorlog.model.LogTable;
 
 
 public class MainActivity extends Activity {
@@ -70,11 +79,8 @@ public class MainActivity extends Activity {
 	}
 	
 	private void setupParse() {
+		ParseObject.registerSubclass(LogTable.class);
 		Parse.initialize(this, PARSE_COM_APPLICATION_ID, PARSE_COM_CLIENT_KEY);
-		
-		ParseObject testObject = new ParseObject("TestObject");
-		testObject.put("foo", "bar");
-		testObject.saveInBackground();
 	}
 
 	private void uploadAllFiles() {
@@ -87,11 +93,36 @@ public class MainActivity extends Activity {
 				return filename.startsWith("accel_");
 			}
 		});
+
+		final List<File> failedUploads = new ArrayList<File>();
 		
-		for(File f : allFiles) {
+		for(final File f : allFiles) {
 			// Only upload offline only files
 			
-//			ParseFile file = new ParseFile("resume.txt", data);
+			try {
+				final ParseFile file = new ParseFile(f.getName(), FileUtils.readFileToByteArray(f));
+				file.saveInBackground(new SaveCallback() {
+					@Override public void done(ParseException ex) {
+						if(ex == null) {
+							// Check if already uploaded
+							
+							LogTable log = new LogTable();
+							log.setFile(f.getName(), file);
+							log.saveInBackground(new SaveCallback() {
+								@Override public void done(ParseException arg0) {
+									failedUploads.add(f);
+								}
+							});
+						} else {
+							Log.e("error", ex.getMessage(), ex);
+							failedUploads.add(f);
+						}
+					}
+				});
+			} catch (IOException e) {
+				Log.e("error", e.getMessage(), e);
+				failedUploads.add(f);
+			}
 			
 		}
 	}
