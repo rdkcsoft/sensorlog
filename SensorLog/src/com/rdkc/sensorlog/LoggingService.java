@@ -25,6 +25,10 @@ import android.widget.Toast;
 
 public class LoggingService extends Service implements SensorEventListener {
 
+	public static final String GYRO_PREFIX = "gyro_";
+
+	public static final String ACCEL_PREFIX = "accel_";
+
 	@SuppressWarnings("unused")
 	private final String TAG = "LoggingService";
 
@@ -104,7 +108,7 @@ public class LoggingService extends Service implements SensorEventListener {
 	@Override
 	public int onStartCommand(Intent intent, int flags, int startid) {
 
-		startRecording("accel_" +sd.format(new Date()), "gyro_" +sd.format(new Date()));
+		startRecording(ACCEL_PREFIX +sd.format(new Date()), GYRO_PREFIX +sd.format(new Date()));
 		Log.d("====== service started", "debug");
 
 		// Do not automatically restart this service if it is killed

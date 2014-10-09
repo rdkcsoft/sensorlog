@@ -17,13 +17,17 @@ import android.util.Log;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.widget.Button;
+import android.widget.Toast;
 
+import com.parse.FindCallback;
 import com.parse.Parse;
 import com.parse.ParseException;
 import com.parse.ParseFile;
 import com.parse.ParseObject;
+import com.parse.ParseQuery;
+import com.parse.ParseUser;
 import com.parse.SaveCallback;
-import com.rdkc.sensorlog.model.LogTable;
+import com.rdkc.sensorlog.model.LogEntry;
 
 
 public class MainActivity extends Activity {
@@ -79,51 +83,75 @@ public class MainActivity extends Activity {
 	}
 	
 	private void setupParse() {
-		ParseObject.registerSubclass(LogTable.class);
+		ParseObject.registerSubclass(LogEntry.class);
 		Parse.initialize(this, PARSE_COM_APPLICATION_ID, PARSE_COM_CLIENT_KEY);
 	}
 
 	private void uploadAllFiles() {
-		File homeDir = new File(".");
+		File homeDir = getFilesDir();
 		
 		File[] allFiles = homeDir.listFiles(new FilenameFilter() {
 			
 			@Override
 			public boolean accept(File dir, String filename) {
-				return filename.startsWith("accel_");
+				return filename.startsWith(LoggingService.ACCEL_PREFIX) || filename.startsWith(LoggingService.GYRO_PREFIX);
 			}
 		});
 
-		final List<File> failedUploads = new ArrayList<File>();
-		
 		for(final File f : allFiles) {
+			final String fileName = f.getName();
+			
 			// Only upload offline only files
+			ParseQuery<LogEntry> query = ParseQuery.getQuery(LogEntry.class);
+			query.whereEqualTo("name", fileName);
+			query.findInBackground(new FindCallback<LogEntry>() {
+			  @Override
+			  public void done(List<LogEntry> results, ParseException ex) {
+				  if(ex == null) {
+					  if(results.isEmpty()) {
+						  uploadFile(f);
+					  } else {
+						  // Don't upload existing files
+						  Log.i("info", "Skipping already uploaded file " + fileName);
+					  }
+				  } else {
+					  logError(ex);
+				  }
+			  }
+			});
 			
-			try {
-				final ParseFile file = new ParseFile(f.getName(), FileUtils.readFileToByteArray(f));
-				file.saveInBackground(new SaveCallback() {
-					@Override public void done(ParseException ex) {
-						if(ex == null) {
-							// Check if already uploaded
-							
-							LogTable log = new LogTable();
-							log.setFile(f.getName(), file);
-							log.saveInBackground(new SaveCallback() {
-								@Override public void done(ParseException arg0) {
-									failedUploads.add(f);
+			
+			uploadFile(f);
+		}
+		
+		Toast.makeText(this, allFiles.length > 0 ? "Upload initiated for " + allFiles.length + " files" : "Nothing to upload.", Toast.LENGTH_LONG).show();
+	}
+
+	public void uploadFile(final File f) {
+		final String fileName = f.getName();
+		
+		try {
+			final byte[] content = FileUtils.readFileToByteArray(f);
+			final ParseFile file = new ParseFile(fileName, content);
+			file.saveInBackground(new SaveCallback() {
+				@Override public void done(ParseException ex) {
+					if(ex == null) {
+						LogEntry log = new LogEntry();
+						log.setFile(fileName, content.length, file);
+						log.saveInBackground(new SaveCallback() {
+							@Override public void done(ParseException ex) {
+								if(ex != null) {
+									logError(ex);
 								}
-							});
-						} else {
-							Log.e("error", ex.getMessage(), ex);
-							failedUploads.add(f);
-						}
+							}
+						});
+					} else {
+						logError(ex);
 					}
-				});
-			} catch (IOException e) {
-				Log.e("error", e.getMessage(), e);
-				failedUploads.add(f);
-			}
-			
+				}
+			});
+		} catch (IOException ex) {
+			logError(ex);
 		}
 	}
 
@@ -162,5 +190,10 @@ public class MainActivity extends Activity {
 
 		//recording = false;
 		//stopRecording();
+	}
+
+	public void logError(Throwable ex) {
+		Log.e("error", ex.getMessage(), ex);
+		Toast.makeText(this, "Upload issues: " + ex.getMessage(), Toast.LENGTH_SHORT).show();
 	}
 }
